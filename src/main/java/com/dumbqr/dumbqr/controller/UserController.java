@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 public class UserController {
@@ -57,9 +58,9 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody User user){
+    public ResponseEntity<?> login(@RequestBody User user){
         try {
-            return new ResponseEntity<>(userService.verify(user),HttpStatus.OK);
+            return new ResponseEntity<>(Map.of("username", user.getEmail().split("@")[0], "token", userService.verify(user)),HttpStatus.OK);
         }catch (Exception e){
             return new ResponseEntity<>(e.getMessage(),HttpStatus.UNAUTHORIZED);
         }
