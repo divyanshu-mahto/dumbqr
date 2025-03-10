@@ -1,29 +1,23 @@
 package com.dumbqr.dumbqr.controller;
 
-import com.dumbqr.dumbqr.model.QrScanLog;
 import com.dumbqr.dumbqr.model.User;
 import com.dumbqr.dumbqr.repository.QrScanLogRepository;
-import com.dumbqr.dumbqr.service.GeolocationService;
-import com.dumbqr.dumbqr.service.JwtService;
+import com.dumbqr.dumbqr.service.*;
 import com.google.zxing.WriterException;
 import com.dumbqr.dumbqr.model.QrCode;
 import com.dumbqr.dumbqr.repository.UserRepository;
-import com.dumbqr.dumbqr.service.QrCodeService;
-import com.dumbqr.dumbqr.service.UserService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/api")
 public class UserController {
 
     @Autowired
@@ -44,14 +38,22 @@ public class UserController {
     @Autowired
     private QrScanLogRepository qrScanLogRepository;
 
+    @Autowired
+    private BloomFilterService bloomFilterService;
+
+    private static final List<String> RESERVED_PREFIXES = List.of("api", "admin", "dashboard");
+
 
     @PostMapping("/register")
     public ResponseEntity<User> registerUser(@RequestBody User user){
-
+        if(user.getEmail() == null || user.getPassword() == null){
+            return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
+        }
         try {
             userService.register(user);
-            return new ResponseEntity<>(userService.register(user),HttpStatus.OK);
-
+            return new ResponseEntity<>(HttpStatus.OK);
+        }catch (DataIntegrityViolationException e) {
+            return new ResponseEntity<>(HttpStatus.CONFLICT);
         }catch (Exception e){
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -59,17 +61,24 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody User user){
+        if(user.getEmail() == null || user.getPassword() == null){
+            return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
+        }
         try {
-            return new ResponseEntity<>(Map.of("username", user.getEmail().split("@")[0], "token", userService.verify(user)),HttpStatus.OK);
+            String token = userService.verify(user);
+            if(token.equals("Fail")){
+                return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+            return new ResponseEntity<>(Map.of("username", user.getEmail().split("@")[0], "token", token),HttpStatus.OK);
         }catch (Exception e){
             return new ResponseEntity<>(e.getMessage(),HttpStatus.UNAUTHORIZED);
         }
     }
 
-
-    @GetMapping("/greet")
+    //easter egg
+    @GetMapping("/amidumb")
     public String greet(){
-        return "Hello There!";
+        return "Yes you are!";
     }
 
     //display a qr code
@@ -95,74 +104,50 @@ public class UserController {
     //To create a new qr
     @PostMapping("/createqr")
     public ResponseEntity<?> createNewQr(@RequestHeader("Authorization") String authHeader, @RequestBody QrCode qrCode) throws IOException, WriterException {
-        //create a short url
-        //it should be unique
-        //either generate random uid or take some user input and check if it exists in db or not <-- do this
-        String shorturl = qrCode.getShortUrl();
-
-        if (!qrCodeService.checkShortId(shorturl).getStatusCode().equals(HttpStatus.OK)){
-            return new ResponseEntity<>("Short url already ", HttpStatus.NOT_ACCEPTABLE);
+        if(qrCode.getShortId().equals("") || RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-        //set short url of qr
-        qrCode.setShortUrl(shorturl);
 
-        //add the qr
-        qrCodeService.addQr(qrCode);
+        //bloom filter
+        if(bloomFilterService.lookUp(qrCode.getShortId())){
+            return new ResponseEntity<>("Short url already taken", HttpStatus.NOT_ACCEPTABLE);
+        }
 
-        //save qr in database  this is redundant qr code is already being inserted in above method
-        qrCodeService.createQR(qrCode);
-
-        //get the user email
         String token = authHeader.substring(7);
         String email = jwtService.extractEmail(token);
 
-        //find the user in db
         User user = userRepository.findByEmail(email);
-
-        //add the new qr code id
-        List<ObjectId> qrcodes = user.getQrcodes();
-        qrcodes.add(qrCode.getId());
-        user.setQrcodes(qrcodes);
-        //update in db
-        userService.updateQrCodeList(user);
-
-        return new ResponseEntity<>("QR code created",HttpStatus.CREATED);
-    }
-
-    //Redirect link noAuth
-    @GetMapping("goto/{shortId}")
-    @ResponseStatus(HttpStatus.FOUND)
-    public ResponseEntity<?> redirect(@PathVariable String shortId, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        try{
-            //check if the short id exists
-            if(qrCodeService.verifyShortId(shortId).getStatusCode().equals(HttpStatus.NOT_FOUND)){
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-
-            String location = geolocationService.getGeolocation(request.getRemoteAddr()).getBody();
-
-            QrScanLog qrScanLog = new QrScanLog();
-            qrScanLog.setShortId(shortId);
-            qrScanLog.setTimestamp(LocalDateTime.now());
-            qrScanLog.setIp(request.getRemoteAddr());
-            qrScanLog.setUserAgent(request.getHeader("User-Agent"));
-            qrScanLog.setLocation(location);
-
-            qrScanLogRepository.save(qrScanLog);
-
-            QrCode qrCode = qrCodeService.getQrCodeObject(shortId);
-            //add the object id of scan in qr list of scans
-            qrCodeService.addQrScan(qrCode,qrScanLog);
-
-            String redirectUrl = qrCodeService.getRedirectUrl(shortId);
-
-            response.sendRedirect(redirectUrl);
-            return new ResponseEntity<>(HttpStatus.OK);
-
-        } catch (Exception e){
-            return new ResponseEntity<>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
+        if (user == null) {
+            return new ResponseEntity<>("User not found", HttpStatus.UNAUTHORIZED);
         }
 
+        try{
+            qrCode.setUser(user);
+            user.getQrCodes().add(qrCode);
+            qrCodeService.createQr(qrCode);
+            return new ResponseEntity<>("Qr code successfully created with Id:"+qrCode.getId(), HttpStatus.OK);
+        } catch (Exception e){
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/qrimage")
+    public ResponseEntity<?> qrimage(@RequestBody QrCode qrCode) throws IOException, WriterException {
+        if(RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        //bloom filter
+        if(bloomFilterService.lookUp(qrCode.getShortId())){
+            return new ResponseEntity<>("Short url already taken", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        try{
+            byte[] qrImage = qrCodeService.getQrimage(qrCode.getShortId(), qrCode.getForeground(), qrCode.getBackground());
+            return new ResponseEntity<>(qrImage, HttpStatus.OK);
+        } catch (Exception e){
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     //view list of all QR code
@@ -204,9 +189,9 @@ public class UserController {
         }
     }
 
-    //update the redirect url
+    //update the redirect url and name
     @PostMapping("/qr/update/{shortId}")
-    public ResponseEntity<?> updateRedirectUrl(@RequestHeader("Authorization") String authHeader, @PathVariable String shortId, @RequestBody String newRedirectUrl){
+    public ResponseEntity<?> updateRedirectUrl(@RequestHeader("Authorization") String authHeader, @PathVariable String shortId, @RequestBody QrCode newQrCode){
         try {
             String token = authHeader.substring(7);
             String email = jwtService.extractEmail(token);
@@ -216,7 +201,7 @@ public class UserController {
                 return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
             }
 
-            return qrCodeService.updateQrCode(user, shortId, newRedirectUrl);
+            return qrCodeService.updateQrCode(user, shortId, newQrCode.getRedirectUrl(), newQrCode.getName());
 
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
@@ -258,7 +243,6 @@ public class UserController {
 
             return userService.deleteUser(user);
 
-
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -278,7 +262,7 @@ public class UserController {
             QrCode qrCode = qrCodeService.getQrCodeObject(shortId);
 
             //check if the QR code belongs to the user
-            if(user.getQrcodes().contains(qrCode.getId())){
+            if(user.getQrCodes().contains(qrCode)){
                 return qrCodeService.getAnalytics(qrCode);
             }else {
                 return new ResponseEntity<>("QR code not found",HttpStatus.NOT_FOUND);

@@ -32,8 +32,10 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .csrf(customizer -> customizer.disable())
                 .authorizeHttpRequests(request -> request
-                        .requestMatchers("/login","/register","/goto/**").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/login", "/api/signup").permitAll()
+                        .requestMatchers("/api/**").authenticated()
+                        .anyRequest().permitAll())
+                .authenticationProvider(authenticationProvider())
                 .httpBasic(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

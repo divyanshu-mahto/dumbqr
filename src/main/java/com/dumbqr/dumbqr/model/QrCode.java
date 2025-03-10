@@ -1,25 +1,48 @@
 package com.dumbqr.dumbqr.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import jakarta.persistence.*;
 import lombok.Data;
-import org.bson.types.Binary;
-import org.bson.types.ObjectId;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-@Document(collection = "qrCodes")
+@Entity
+@Table(name = "qr_codes")
 @Data
-public class QrCode {
+public class QrCode implements Serializable {
     @Id
-    private ObjectId id;
-    private String shortUrl;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private long id;
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "short_id", nullable = false, unique = true)
+    private String shortId;
+
+    @Column(name = "redirect_url", nullable = false)
     private String redirectUrl;
-    private Binary qrcode;
+
+    @Column(name = "qrcode")
+    private byte[] qrcode;
+
+    @Column(name = "foreground")
     private String foreground;
+
+    @Column(name = "background")
     private String background;
-    private List<ObjectId> scans = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonBackReference
+    private User user;
+
+    @OneToMany(mappedBy = "qrCode", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<QrScanLog> scansLogs = new ArrayList<>();
 }
 
 ////0xFF000002, 0xFFFFFFFF

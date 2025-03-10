@@ -12,18 +12,18 @@ import com.google.zxing.client.j2se.MatrixToImageConfig;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
-import org.bson.BsonBinarySubType;
-import org.bson.types.Binary;
-import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -38,9 +38,14 @@ public class QrCodeService {
     @Autowired
     private QrScanLogRepository qrScanLogRepository;
 
-    public QrCode getQrCodeObject(String shortId){
-        return qrCodeRepository.findByShortUrl(shortId);
-    }
+    @Value("${shorturl.prefix}")
+    private String shortUrlPrefix;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    private BloomFilterService bloomFilterService;
 
     public byte[] getQrCodeImage(String text, int width, int height, String foreground, String  background) throws WriterException, IOException {
         QRCodeWriter qrCodeWriter = new QRCodeWriter();
@@ -49,21 +54,20 @@ public class QrCodeService {
         MatrixToImageConfig config = new MatrixToImageConfig(
                 (int) Long.parseLong(foreground.replace("0x", ""), 16),
                 (int) Long.parseLong(background.replace("0x", ""), 16)
-//                0xFF000002,0xFFFFFFFF
         );
         MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream, config);
         return pngOutputStream.toByteArray();
     }
 
-    public ResponseEntity<byte[]> getQr(User user, String shortid){
+    //api to display QR code
+    public ResponseEntity<byte[]> getQr(User user, String shortId){
         try{
-            List<ObjectId> qrids = user.getQrcodes();
-            QrCode qrCode = qrCodeRepository.findByShortUrl(shortid);
+            QrCode qrCode = qrCodeRepository.findByShortId(shortId);
             if(qrCode == null){
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             }
-            if(qrids.contains(qrCode.getId())){
-                byte[] qrImage = qrCode.getQrcode().getData();
+            if(user.getQrCodes().contains(qrCode)){
+                byte[] qrImage = qrCode.getQrcode();
                 return ResponseEntity
                         .ok()
                         .contentType(MediaType.IMAGE_PNG)
@@ -77,75 +81,53 @@ public class QrCodeService {
         }
     }
 
-    public String addQr(QrCode qrCode) throws IOException, WriterException {
 
-        byte[] qrImage = getQrCodeImage("http://localhost:8080/goto/"+qrCode.getShortUrl(), 250, 250, qrCode.getForeground(), qrCode.getBackground());
-        qrCode.setQrcode(new Binary(BsonBinarySubType.BINARY, qrImage));
+    @Transactional
+    public String createQr(QrCode qrCode) throws IOException, WriterException {
 
-        qrCode = qrCodeRepository.insert(qrCode);
-        return "QR Code created with ID: " + qrCode.getId();
-    }
+        byte[] qrImage = getQrCodeImage(shortUrlPrefix+qrCode.getShortId(), 250, 250, qrCode.getForeground(), qrCode.getBackground());
 
-    public QrCode getQr(ObjectId id){
-        return qrCodeRepository.findById(id).get();
-    }
-
-    public void createQR(QrCode qrCode){
-        qrCodeRepository.save(qrCode);
-    }
-
-    //check if some short id is avaliable to take or not
-    public ResponseEntity<String> checkShortId(String shortUrl){
-        QrCode qrCode = qrCodeRepository.findByShortUrl(shortUrl);
-        if (qrCode != null){
-            return new ResponseEntity<>("Short url already taken",HttpStatus.NOT_ACCEPTABLE);
-        }else{
-            return new ResponseEntity<>("Short url available", HttpStatus.OK);
-        }
-    }
-
-    //verify if a shortid is valid or not for redirecting
-    public ResponseEntity<String> verifyShortId(String shortUrl){
-        QrCode qrCode = qrCodeRepository.findByShortUrl(shortUrl);
-        if (qrCode != null){
-            return new ResponseEntity<>("ShortId exists", HttpStatus.OK);
-        }else{
-            return new ResponseEntity<>("ShortId does not exist", HttpStatus.NOT_FOUND);
-        }
-    }
-
-    public String getRedirectUrl(String shortId){
-        QrCode qrCode = qrCodeRepository.findByShortUrl(shortId);
-        if (qrCode == null) {
-            throw new RuntimeException("QR Code not found for shortid: " + shortId);
+        if (qrImage == null || qrImage.length == 0) {
+            throw new IllegalStateException("Failed to generate QR code image");
         }
 
+        qrCode.setQrcode(qrImage);
+
+        qrCode = qrCodeRepository.save(qrCode);
+
+        redisTemplate.opsForValue().set(qrCode.getShortId(), qrCode.getRedirectUrl(), Duration.ofMinutes(10));
+        bloomFilterService.add(qrCode.getShortId());
         return qrCode.getRedirectUrl();
     }
 
+    public byte[] getQrimage(String shortId, String foreground, String background) throws IOException, WriterException {
+
+        byte[] qrImage = getQrCodeImage(shortUrlPrefix+shortId, 250, 250, foreground, background);
+
+        if (qrImage == null || qrImage.length == 0) {
+            throw new IllegalStateException("Failed to generate QR code image");
+        }
+        return qrImage;
+    }
+
+    //return qr code object by shortId
+    public QrCode getQrCodeObject(String shortId){
+        return qrCodeRepository.findByShortId(shortId);
+    }
+
     public ResponseEntity<String> deleteQrCode(User user, String shortId){
-        QrCode qrCode = qrCodeRepository.findByShortUrl(shortId);
+        QrCode qrCode = qrCodeRepository.findByShortId(shortId);
         if (qrCode == null){
             return new ResponseEntity<>("Qr code not found", HttpStatus.NOT_FOUND);
         }
 
         //check if the QR code belongs to the user
-        if(user.getQrcodes().contains(qrCode.getId())){
+        if(qrCode.getUser().equals(user)){
 
-            List<ObjectId> qrids = user.getQrcodes();
-            qrids.remove(qrCode.getId());
-            user.setQrcodes(qrids);
-            userRepository.save(user);
-
-            //delete the scans
-            List<ObjectId> scans = qrCode.getScans();
-            for (ObjectId scan : scans){
-                qrScanLogRepository.deleteById(scan);
-            }
-
-            //delete the qr code
+            user.getQrCodes().remove(qrCode);
             qrCodeRepository.deleteById(qrCode.getId());
 
+            redisTemplate.delete(shortId);
 
             return new ResponseEntity<>("Successfully Deleted",HttpStatus.OK);
 
@@ -154,16 +136,20 @@ public class QrCodeService {
         }
     }
 
-    public ResponseEntity<?> updateQrCode(User user, String shortId, String newRedirectUrl) {
-        QrCode qrCode = qrCodeRepository.findByShortUrl(shortId);
+    public ResponseEntity<?> updateQrCode(User user, String shortId, String newRedirectUrl, String newName) {
+        QrCode qrCode = qrCodeRepository.findByShortId(shortId);
         if (qrCode == null){
             return new ResponseEntity<>("Qr code not found", HttpStatus.NOT_FOUND);
         }
 
         //check if the QR code belongs to the user
-        if(user.getQrcodes().contains(qrCode.getId())){
+        if(user.getQrCodes().contains(qrCode)){
             qrCode.setRedirectUrl(newRedirectUrl);
+            qrCode.setName(newName);
             qrCodeRepository.save(qrCode);
+
+            redisTemplate.opsForValue().set(shortId, newRedirectUrl, Duration.ofMinutes(10));
+
             return new ResponseEntity<>("Redirect url updated",HttpStatus.OK);
 
         }else {
@@ -172,28 +158,10 @@ public class QrCodeService {
 
     }
 
-    //update qr code scans
-    public ResponseEntity<?> addQrScan(QrCode qrCode, QrScanLog qrScanLog){
-        List<ObjectId> scans = qrCode.getScans();
-        scans.add(qrScanLog.getId());
-        qrCode.setScans(scans);
-        qrCodeRepository.save(qrCode);
-        return new ResponseEntity<>(HttpStatus.OK);
-    }
-
-    //get analytics
+    //get analytics api
     public ResponseEntity<?> getAnalytics(QrCode qrCode){
 
-        List<ObjectId> scans = qrCode.getScans();
-        List<QrScanLog> analytics = new ArrayList<>();
-
-        for (ObjectId id : scans) {
-            qrScanLogRepository.findById(id).ifPresent(analytics::add);
-        }
-
-        if (analytics.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
+        List<QrScanLog> analytics = qrCode.getScansLogs();
 
         return new ResponseEntity<>(analytics, HttpStatus.OK);
     }

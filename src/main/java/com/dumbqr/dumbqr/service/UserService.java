@@ -4,8 +4,9 @@ import com.dumbqr.dumbqr.model.QrCode;
 import com.dumbqr.dumbqr.model.User;
 import com.dumbqr.dumbqr.repository.QrCodeRepository;
 import com.dumbqr.dumbqr.repository.UserRepository;
-import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,7 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 
-import java.util.ArrayList;
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -28,15 +29,21 @@ public class UserService {
     private QrCodeRepository qrCodeRepository;
 
     @Autowired
-    AuthenticationManager authenticationManager;
+    private AuthenticationManager authenticationManager;
 
     @Autowired
-    JwtService jwtService;
+    private JwtService jwtService;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
 
     private BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder(12);
 
 
     public User register(User user){
+        if (userRepository.existsByEmail(user.getEmail())) {
+            throw new DataIntegrityViolationException("Email already in use");
+        }
         user.setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
         return userRepository.save(user);
     }
@@ -50,24 +57,19 @@ public class UserService {
         }
     }
 
-    public void updateQrCodeList(User user){
-        userRepository.save(user);
-    }
-
-
     public ResponseEntity<List<QrCode>> getAllQr(User user) {
-        List<ObjectId> qrids = user.getQrcodes();
-        List<QrCode> qrs = new ArrayList<>();
 
-        for (ObjectId id : qrids) {
-            qrCodeRepository.findById(id).ifPresent(qrs::add);
-        }
+        List<QrCode> qrCodes = user.getQrCodes();
 
-        if (qrs.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
+        qrCodes.forEach(qrCode -> {
+            // Check if the QR code shortId exists in Redis
+            if (Boolean.FALSE.equals(redisTemplate.hasKey(qrCode.getShortId()))) {
+                // Cache if not already cached
+                redisTemplate.opsForValue().set(qrCode.getShortId(), qrCode.getRedirectUrl(), Duration.ofMinutes(10));
+            }
+        });
 
-        return new ResponseEntity<>(qrs, HttpStatus.OK);
+        return new ResponseEntity<>(qrCodes, HttpStatus.OK);
     }
 
 
@@ -77,13 +79,6 @@ public class UserService {
     }
 
     public ResponseEntity<?> deleteUser(User user){
-
-        //delete the qr codes of user
-        List<ObjectId> qrcodes = user.getQrcodes();
-        for (ObjectId qrcode : qrcodes){
-            qrCodeRepository.deleteById(qrcode);
-        }
-
         userRepository.delete(user);
         return new ResponseEntity<>("User deleted",HttpStatus.OK);
     }

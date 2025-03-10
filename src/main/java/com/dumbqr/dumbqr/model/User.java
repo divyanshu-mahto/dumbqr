@@ -1,22 +1,27 @@
 package com.dumbqr.dumbqr.model;
 
-
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import jakarta.persistence.*;
 import lombok.Data;
-import org.bson.types.ObjectId;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-@Document(collection = "users")
+@Entity
+@Table(name = "users")
 @Data
-public class User {
+public class User implements Serializable {
 
     @Id
-    private ObjectId id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private long id;
+
+    @Column(unique = true, nullable = false)
     private String email;
+
     private String password;
 
-    private List<ObjectId> qrcodes = new ArrayList<>();
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<QrCode> qrCodes = new ArrayList<>();
 }
