@@ -44,9 +44,10 @@ public class UserController {
     private static final List<String> RESERVED_PREFIXES = List.of("api", "admin", "dashboard");
 
 
-    @PostMapping("/register")
+    @PostMapping("/signup")
+    @RateLimited
     public ResponseEntity<User> registerUser(@RequestBody User user){
-        if(user.getEmail() == null || user.getPassword() == null){
+        if(user.getEmail() == null || user.getPassword() == null || user.getEmail().length() == 0 || user.getPassword().length() == 0){
             return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
         }
         try {
@@ -60,8 +61,9 @@ public class UserController {
     }
 
     @PostMapping("/login")
+    @RateLimited
     public ResponseEntity<?> login(@RequestBody User user){
-        if(user.getEmail() == null || user.getPassword() == null){
+        if(user.getEmail() == null || user.getPassword() == null || user.getEmail().length() == 0 || user.getPassword().length() == 0){
             return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
         }
         try {
@@ -83,6 +85,7 @@ public class UserController {
 
     //display a qr code
     @GetMapping("/qr/{shortId}")
+    @RateLimited
     public ResponseEntity<byte[]> getQrCode(@RequestHeader("Authorization") String authHeader, @PathVariable String shortId) {
 
         try {
@@ -103,8 +106,9 @@ public class UserController {
 
     //To create a new qr
     @PostMapping("/createqr")
+    @RateLimited
     public ResponseEntity<?> createNewQr(@RequestHeader("Authorization") String authHeader, @RequestBody QrCode qrCode) throws IOException, WriterException {
-        if(qrCode.getShortId().equals("") || RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
+        if(qrCode.getShortId().equals("") || qrCode.getRedirectUrl().equals("") || qrCode.getName().equals("") || RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
 
@@ -152,6 +156,7 @@ public class UserController {
 
     //view list of all QR code
     @GetMapping("/allqr")
+    @RateLimited
     public ResponseEntity<List<QrCode>> viewAllQr(@RequestHeader("Authorization") String authHeader){
         try{
             String token = authHeader.substring(7);
@@ -172,6 +177,7 @@ public class UserController {
 
     //delete a qr
     @DeleteMapping("/qr/{shortId}")
+    @RateLimited
     public ResponseEntity<?> deleteQr(@RequestHeader("Authorization") String authHeader, @PathVariable String shortId){
         try {
             String token = authHeader.substring(7);
@@ -191,6 +197,7 @@ public class UserController {
 
     //update the redirect url and name
     @PostMapping("/qr/update/{shortId}")
+    @RateLimited
     public ResponseEntity<?> updateRedirectUrl(@RequestHeader("Authorization") String authHeader, @PathVariable String shortId, @RequestBody QrCode newQrCode){
         try {
             String token = authHeader.substring(7);
@@ -210,6 +217,7 @@ public class UserController {
 
     //update user password
     @PostMapping("/user/update")
+    @RateLimited
     public ResponseEntity<?> updateUserPassword(@RequestHeader("Authorization") String authHeader, @RequestBody User newuser){
         try {
             String token = authHeader.substring(7);
@@ -231,6 +239,7 @@ public class UserController {
 
     //Delete user
     @DeleteMapping("/user/delete")
+    @RateLimited
     public ResponseEntity<?> updateUserPassword(@RequestHeader("Authorization") String authHeader){
         try {
             String token = authHeader.substring(7);
@@ -250,6 +259,7 @@ public class UserController {
 
     //all scans of a QR code
     @GetMapping("/qr/analytics/{shortId}")
+    @RateLimited
     public ResponseEntity<?> qrAnalytics(@RequestHeader("Authorization") String authHeader, @PathVariable String shortId){
         try {
             String token = authHeader.substring(7);

@@ -53,35 +53,6 @@ public class PublicController {
     }
 
     //Redirect link noAuth
-    @GetMapping("goto/{shortId}")
-    @ResponseStatus(HttpStatus.FOUND)
-    public ResponseEntity<?> redirectOld(@PathVariable String shortId, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        try{
-            String cachedRedirectUrl = redisTemplate.opsForValue().get(shortId);
-
-            if(cachedRedirectUrl != null){
-
-                //perform log write
-                logScan(request, shortId, LocalDateTime.now());
-
-                response.sendRedirect(cachedRedirectUrl);
-                return new ResponseEntity<>(HttpStatus.OK);
-            }
-
-            QrCode qrCode = qrCodeService.getQrCodeObject(shortId);
-            if(qrCode == null){
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-            logScan(request, shortId, LocalDateTime.now());
-            redisTemplate.opsForValue().set(shortId, qrCode.getRedirectUrl(), Duration.ofMinutes(10));
-            response.sendRedirect(qrCode.getRedirectUrl());
-            return new ResponseEntity<>(HttpStatus.OK);
-
-        } catch (Exception e){
-            return new ResponseEntity<>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
     @GetMapping("/{shortId}")
     @ResponseStatus(HttpStatus.FOUND)
     public ResponseEntity<?> redirect(@PathVariable String shortId, HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -94,22 +65,24 @@ public class PublicController {
                 logScan(request, shortId, LocalDateTime.now());
 
                 response.sendRedirect(cachedRedirectUrl);
-                return new ResponseEntity<>(HttpStatus.OK);
+                return new ResponseEntity<>(HttpStatus.TEMPORARY_REDIRECT);
             }
 
             //bloom filter
             if(!bloomFilterService.lookUp(shortId)){
+                response.sendRedirect(frontendUrl);
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             }
 
             QrCode qrCode = qrCodeService.getQrCodeObject(shortId);
             if(qrCode == null){
+                response.sendRedirect(frontendUrl);
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             }
             logScan(request, shortId, LocalDateTime.now());
             redisTemplate.opsForValue().set(shortId, qrCode.getRedirectUrl(), Duration.ofMinutes(10));
             response.sendRedirect(qrCode.getRedirectUrl());
-            return new ResponseEntity<>(HttpStatus.OK);
+            return new ResponseEntity<>(HttpStatus.TEMPORARY_REDIRECT);
 
         } catch (Exception e){
             return new ResponseEntity<>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
