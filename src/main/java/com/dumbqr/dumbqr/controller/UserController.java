@@ -1,5 +1,7 @@
 package com.dumbqr.dumbqr.controller;
 
+import com.dumbqr.dumbqr.dto.VerifyForgotPasswordDto;
+import com.dumbqr.dumbqr.dto.VerifyUserEmailDto;
 import com.dumbqr.dumbqr.model.User;
 import com.dumbqr.dumbqr.repository.QrScanLogRepository;
 import com.dumbqr.dumbqr.service.*;
@@ -67,13 +69,88 @@ public class UserController {
             return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
         }
         try {
-            String token = userService.verify(user);
+            String token = userService.verifyLogin(user);
             if(token.equals("Fail")){
                 return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
             }
             return new ResponseEntity<>(Map.of("username", user.getEmail().split("@")[0], "token", token),HttpStatus.OK);
         }catch (Exception e){
-            return new ResponseEntity<>(e.getMessage(),HttpStatus.UNAUTHORIZED);
+            if(e.getMessage().equals("Account not verified")) return new ResponseEntity<>(e.getMessage(), HttpStatus.UNAUTHORIZED);
+            else return new ResponseEntity<>(e.getMessage(),HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @PostMapping("/verify")
+    @RateLimited
+    public ResponseEntity<?> verifyUser(@RequestBody VerifyUserEmailDto verifyUserEmailDto){
+        try{
+            if(verifyUserEmailDto.getEmail() == null || verifyUserEmailDto.getCode() == null || verifyUserEmailDto.getEmail().length() == 0 || verifyUserEmailDto.getCode().length() == 0){
+                return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
+            }
+            User user = userRepository.findByEmail(verifyUserEmailDto.getEmail());
+            if(user == null){
+                return new ResponseEntity<>("User not found",HttpStatus.NOT_FOUND);
+            }
+            //if verification successful return token
+            String token = userService.verifyUser(user, verifyUserEmailDto.getCode());
+            return new ResponseEntity<>(Map.of("username", user.getEmail().split("@")[0], "token", token), HttpStatus.OK);
+        } catch (Exception e){
+            return new ResponseEntity<>(e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/resend")
+    @RateLimited
+    public ResponseEntity<?> resendEmail(@RequestBody String email){
+        try{
+            User user = userRepository.findByEmail(email);
+            if(user == null){
+                return new ResponseEntity<>("User not found",HttpStatus.NOT_FOUND);
+            }
+            userService.resendVerificationEmail(user);
+            return new ResponseEntity<>("Verification code sent", HttpStatus.OK);
+        } catch (Exception e){
+            if(e.getMessage().equals("User already verified")) return new ResponseEntity<>(e.getMessage(), HttpStatus.ACCEPTED);
+            else if(e.getMessage().equals("User not found")) return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+            else return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/forgot")
+    @RateLimited
+    public ResponseEntity<?> forgotPasswordRequest(@RequestBody String email){
+        if(email == null || email.length() == 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        try{
+            User user = userRepository.findByEmail(email);
+            if(user == null){
+                return new ResponseEntity<>("No user found for the provided email", HttpStatus.NOT_FOUND);
+            }
+            userService.forgotPasswordMail(user);
+            return new ResponseEntity<>("Password reset verification code sent", HttpStatus.OK);
+
+        } catch (Exception e){
+            return new ResponseEntity<>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/forgot/changepassword")
+    @RateLimited
+    public ResponseEntity<?> forgotChangePassword(@RequestBody VerifyForgotPasswordDto verifyForgotPasswordDto){
+        if(verifyForgotPasswordDto.getEmail() == null || verifyForgotPasswordDto.getCode() == null || verifyForgotPasswordDto.getNewPassword() == null || verifyForgotPasswordDto.getEmail().length() == 0 || verifyForgotPasswordDto.getCode().length() == 0 || verifyForgotPasswordDto.getNewPassword().length() == 0){
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+        try{
+            User user = userRepository.findByEmail(verifyForgotPasswordDto.getEmail());
+            if(user == null){
+                return new ResponseEntity<>("User not found",HttpStatus.NOT_FOUND);
+            }
+            //if verification successful return token
+            String token = userService.verifyForgotPassword(user, verifyForgotPasswordDto);
+
+            return new ResponseEntity<>(Map.of("username", user.getEmail().split("@")[0], "token", token), HttpStatus.OK);
+
+        } catch (Exception e){
+            return new ResponseEntity<>(e.getMessage(),HttpStatus.BAD_REQUEST);
         }
     }
 

@@ -142,6 +142,13 @@
 			<version>6.5.5.RELEASE</version>
 		</dependency>
 
+<!---EMAIL-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+			<version>3.4.4</version>
+		</dependency>
+
 <!--LOMBOK-->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
