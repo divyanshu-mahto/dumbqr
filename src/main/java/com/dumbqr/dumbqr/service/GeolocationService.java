@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class GeolocationService {
 
-    Dotenv dotenv = Dotenv.load();
-
     public class LocationInfo{
         public String country;
         public String state;
@@ -44,10 +42,8 @@ public class GeolocationService {
                 locationInfo.country = jsonObject.optString("country_name","Unknown");
                 locationInfo.state = jsonObject.optString("state_prov","Unknown");
                 locationInfo.city = jsonObject.optString("city","Unknown");
-                return new ResponseEntity<>(locationInfo, HttpStatus.OK);
-            }else{
-                return new ResponseEntity<>(locationInfo, HttpStatus.OK);
             }
+            return new ResponseEntity<>(locationInfo, HttpStatus.OK);
         } catch (Exception e){
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
