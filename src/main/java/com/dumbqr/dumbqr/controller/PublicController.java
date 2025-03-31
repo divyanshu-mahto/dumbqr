@@ -114,24 +114,4 @@ public class PublicController {
             System.out.println("Logging failed: "+e.getMessage());
         }
     }
-
-    @RequestMapping("/bloom/add/{st}")
-    public ResponseEntity<?> bloomAdd(@PathVariable String st){
-        try{
-            bloomFilterService.add(st);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e){
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    @RequestMapping("/bloom/look/{st}")
-    public ResponseEntity<?> bloomCheck(@PathVariable String st){
-        try{
-            return new ResponseEntity<>(bloomFilterService.lookUp(st), HttpStatus.OK);
-        } catch (Exception e){
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
 }

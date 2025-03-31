@@ -4,6 +4,7 @@ import com.dumbqr.dumbqr.model.User;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -14,6 +15,9 @@ public class EmailService {
 
     @Autowired
     private JavaMailSender javaMailSender;
+
+    @Value("${spring.mail.username}")
+    private String supportEmail;
 
     @Async
     public void sendEmail(String to, String subject, String content) throws MessagingException {
@@ -171,7 +175,7 @@ public class EmailService {
                 "              <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; min-width: 100%; width: 100%;\" width=\"100%\">\n" +
                 "                <tr>\n" +
                 "                  <td class=\"content-block\" style=\"font-family: sans-serif; vertical-align: top; padding-bottom: 10px; padding-top: 10px; color: #555555; font-size: 12px; text-align: center;\" valign=\"top\" align=\"center\">\n" +
-                "                    <span class=\"apple-link\" style=\"color: #555555; font-size: 12px; text-align: center;\">support-dumbqr@gmail.com</span>\n" +
+                "                    <span class=\"apple-link\" style=\"color: #555555; font-size: 12px; text-align: center;\">"+supportEmail+"</span>\n" +
                 "                  </td>\n" +
                 "                </tr>\n" +
                 "              </table>\n" +
@@ -336,7 +340,7 @@ public class EmailService {
                 "              <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; min-width: 100%; width: 100%;\" width=\"100%\">\n" +
                 "                <tr>\n" +
                 "                  <td class=\"content-block\" style=\"font-family: sans-serif; vertical-align: top; padding-bottom: 10px; padding-top: 10px; color: #555555; font-size: 12px; text-align: center;\" valign=\"top\" align=\"center\">\n" +
-                "                    <span class=\"apple-link\" style=\"color: #555555; font-size: 12px; text-align: center;\">support-dumbqr@gmail.com</span>\n" +
+                "                    <span class=\"apple-link\" style=\"color: #555555; font-size: 12px; text-align: center;\">"+supportEmail+"</span>\n" +
                 "                  </td>\n" +
                 "                </tr>\n" +
                 "              </table>\n" +
