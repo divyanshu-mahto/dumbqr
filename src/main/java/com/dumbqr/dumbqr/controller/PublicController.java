@@ -35,6 +35,9 @@ public class PublicController {
     @Value("${frontend.url}")
     private String frontendUrl;
 
+    @Value("${frontend.not.found.url}")
+    private String frontendNotFoundUrl;
+
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
@@ -70,13 +73,13 @@ public class PublicController {
 
             //bloom filter
             if(!bloomFilterService.lookUp(shortId)){
-                response.sendRedirect(frontendUrl);
+                response.sendRedirect(frontendNotFoundUrl);
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             }
 
             QrCode qrCode = qrCodeService.getQrCodeObject(shortId);
             if(qrCode == null){
-                response.sendRedirect(frontendUrl);
+                response.sendRedirect(frontendNotFoundUrl);
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             }
             logScan(request, shortId, LocalDateTime.now());
