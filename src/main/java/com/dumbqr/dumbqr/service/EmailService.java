@@ -10,6 +10,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.UnsupportedEncodingException;
+
 @Service
 public class EmailService {
 
@@ -20,10 +22,10 @@ public class EmailService {
     private String supportEmail;
 
     @Async
-    public void sendEmail(String to, String subject, String content) throws MessagingException {
+    public void sendEmail(String to, String subject, String content) throws MessagingException, UnsupportedEncodingException {
         MimeMessage message = javaMailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setFrom(supportEmail, "DumbQR");
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(content, true);

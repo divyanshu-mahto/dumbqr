@@ -185,8 +185,11 @@ public class UserController {
     @PostMapping("/createqr")
     @RateLimited
     public ResponseEntity<?> createNewQr(@RequestHeader("Authorization") String authHeader, @RequestBody QrCode qrCode) throws IOException, WriterException {
-        if(qrCode.getShortId().equals("") || qrCode.getRedirectUrl().equals("") || qrCode.getName().equals("") || RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        if(qrCode.getShortId().equals("") || qrCode.getRedirectUrl().equals("") || qrCode.getName().equals("")){
+            return new ResponseEntity<>("ShortURL or RedirectURL empty",HttpStatus.BAD_REQUEST);
+        }
+        if(RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
+            return new ResponseEntity<>("ShortURL contains reserved keywords", HttpStatus.BAD_REQUEST);
         }
 
         //bloom filter

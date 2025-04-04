@@ -49,7 +49,7 @@ public class PublicController {
     public ResponseEntity<?> homepage(HttpServletResponse response) throws IOException {
         try{
             response.sendRedirect(frontendUrl);
-            return new ResponseEntity<>(HttpStatus.OK);
+            return new ResponseEntity<>(HttpStatus.PERMANENT_REDIRECT);
         } catch (Exception e){
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
