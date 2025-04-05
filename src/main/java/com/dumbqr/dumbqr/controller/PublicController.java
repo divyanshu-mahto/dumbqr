@@ -99,11 +99,13 @@ public class PublicController {
             QrCode qrCode = qrCodeService.getQrCodeObject(shortId);
             if(qrCode == null) return;
 
-            GeolocationService.LocationInfo location = geolocationService.getGeolocation(request.getRemoteAddr()).getBody();
+            String ipAddress = getUserIp(request);
+
+            GeolocationService.LocationInfo location = geolocationService.getGeolocation(ipAddress).getBody();
 
             QrScanLog qrScanLog = new QrScanLog();
             qrScanLog.setTimestamp(time);
-            qrScanLog.setIp(request.getRemoteAddr());
+            qrScanLog.setIp(ipAddress);
             qrScanLog.setUserAgent(request.getHeader("User-Agent"));
             qrScanLog.setCountry(location.country);
             qrScanLog.setState(location.state);
@@ -114,7 +116,26 @@ public class PublicController {
             qrScanLogRepository.save(qrScanLog);
 
         } catch (Exception e){
-            System.out.println("Logging failed: "+e.getMessage());
+            System.err.println("Logging failed: "+e.getMessage());
         }
+    }
+
+    private String getUserIp(HttpServletRequest request){
+        String ipAddress = request.getHeader("X-Real-IP");
+
+        if(ipAddress == null || ipAddress.isEmpty()){
+            ipAddress = request.getHeader("X-Forwarded-For");
+            if(ipAddress != null && !ipAddress.isEmpty()) {
+                String[] ips = ipAddress.split((","));
+                ipAddress = ips[0];
+            }
+        }
+        if(ipAddress == null || ipAddress.isEmpty()){
+            ipAddress = request.getHeader("CF-Connecting-IP");
+        }
+        if(ipAddress == null || ipAddress.isEmpty()){
+            ipAddress = request.getRemoteAddr();
+        }
+        return ipAddress;
     }
 }
