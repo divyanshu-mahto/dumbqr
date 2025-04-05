@@ -34,7 +34,7 @@ public class EmailService {
     }
 
     @Async
-    public void sendVerificationEmail(User user){
+    public String sendVerificationEmail(User user){
         String subject = "Confirm your email address";
         String verificationCode = user.getVerificationCode();
         String htmlMessage = "<!doctype html>\n" +
@@ -193,13 +193,14 @@ public class EmailService {
 
         try{
             sendEmail(user.getEmail(), subject, htmlMessage);
+            return "Success";
         } catch (Exception e){
-            System.out.println("Error sending mail "+e.getMessage());
+            return "Error sending mail "+e.getMessage();
         }
     }
 
     @Async
-    public void sendForgotPasswordEmail(User user){
+    public String sendForgotPasswordEmail(User user){
         String subject = "DumbQR Password reset";
         String verificationCode = user.getVerificationCode();
         String htmlMessage = "<!doctype html>\n" +
@@ -358,8 +359,9 @@ public class EmailService {
 
         try{
             sendEmail(user.getEmail(), subject, htmlMessage);
+            return "Success";
         } catch (Exception e){
-            System.out.println("Error sending mail "+e.getMessage());
+            return "Error sending mail "+e.getMessage();
         }
     }
 }

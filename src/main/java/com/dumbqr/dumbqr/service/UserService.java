@@ -53,7 +53,10 @@ public class UserService {
         user.setVerificationCode(generateVerificationCode());
         user.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(5L));
         user.setVerified(false);
-        emailService.sendVerificationEmail(user);
+        String emailSentResponse = emailService.sendVerificationEmail(user);
+        if(!emailSentResponse.equals("Success")){
+            throw new RuntimeException("Error sending mail");
+        }
         return userRepository.save(user);
     }
 
@@ -86,14 +89,20 @@ public class UserService {
         }
         user.setVerificationCode(generateVerificationCode());
         user.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(5));
-        emailService.sendVerificationEmail(user);
+        String emailSentResponse = emailService.sendVerificationEmail(user);
+        if(!emailSentResponse.equals("Success")){
+            throw new RuntimeException("Error sending mail");
+        }
         userRepository.save(user);
     }
 
     public void resendForgotPasswordEmail(User user){
         user.setVerificationCode(generateVerificationCode());
         user.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(5));
-        emailService.sendForgotPasswordEmail(user);
+        String sendEmailResponse =  emailService.sendForgotPasswordEmail(user);
+        if(!sendEmailResponse.equals("Success")){
+            throw new RuntimeException("Error sending mail");
+        }
         userRepository.save(user);
     }
 

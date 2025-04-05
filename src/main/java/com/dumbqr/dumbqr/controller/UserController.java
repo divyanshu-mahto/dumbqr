@@ -48,7 +48,7 @@ public class UserController {
 
     @PostMapping("/signup")
     @RateLimited
-    public ResponseEntity<User> registerUser(@RequestBody User user){
+    public ResponseEntity<?> registerUser(@RequestBody User user){
         if(user.getEmail() == null || user.getPassword() == null || user.getEmail().length() == 0 || user.getPassword().length() == 0){
             return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
         }
@@ -58,7 +58,7 @@ public class UserController {
         }catch (DataIntegrityViolationException e) {
             return new ResponseEntity<>(HttpStatus.CONFLICT);
         }catch (Exception e){
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -76,6 +76,7 @@ public class UserController {
             return new ResponseEntity<>(Map.of("username", user.getEmail().split("@")[0], "token", token),HttpStatus.OK);
         }catch (Exception e){
             if(e.getMessage().equals("Account not verified")) return new ResponseEntity<>(e.getMessage(), HttpStatus.UNAUTHORIZED);
+            else if(e.getMessage().equals("Error sending mail")) return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
             else return new ResponseEntity<>(e.getMessage(),HttpStatus.UNAUTHORIZED);
         }
     }
@@ -101,7 +102,7 @@ public class UserController {
 
     @PostMapping("/resend")
     @RateLimited
-    public ResponseEntity<?> resendEmail(@RequestBody String email){
+    public ResponseEntity<String> resendEmail(@RequestBody String email){
         try{
             User user = userRepository.findByEmail(email);
             if(user == null){
@@ -118,7 +119,7 @@ public class UserController {
 
     @PostMapping("/forgot")
     @RateLimited
-    public ResponseEntity<?> forgotPasswordRequest(@RequestBody String email){
+    public ResponseEntity<String> forgotPasswordRequest(@RequestBody String email){
         if(email == null || email.length() == 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         try{
             User user = userRepository.findByEmail(email);
@@ -152,12 +153,6 @@ public class UserController {
         } catch (Exception e){
             return new ResponseEntity<>(e.getMessage(),HttpStatus.BAD_REQUEST);
         }
-    }
-
-    //easter egg
-    @GetMapping("/amidumb")
-    public String greet(){
-        return "Yes you are!";
     }
 
     //display a qr code
