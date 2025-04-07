@@ -210,24 +210,6 @@ public class UserController {
         }
     }
 
-    @PostMapping("/qrimage")
-    public ResponseEntity<?> qrimage(@RequestBody QrCode qrCode) throws IOException, WriterException {
-        if(RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-
-        //bloom filter
-        if(bloomFilterService.lookUp(qrCode.getShortId())){
-            return new ResponseEntity<>("Short url already taken", HttpStatus.NOT_ACCEPTABLE);
-        }
-
-        try{
-            byte[] qrImage = qrCodeService.getQrimage(qrCode.getShortId(), qrCode.getForeground(), qrCode.getBackground());
-            return new ResponseEntity<>(qrImage, HttpStatus.OK);
-        } catch (Exception e){
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
 
     //view list of all QR code
     @GetMapping("/allqr")

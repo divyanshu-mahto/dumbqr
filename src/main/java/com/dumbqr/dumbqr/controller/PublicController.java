@@ -6,6 +6,7 @@ import com.dumbqr.dumbqr.repository.QrScanLogRepository;
 import com.dumbqr.dumbqr.service.BloomFilterService;
 import com.dumbqr.dumbqr.service.GeolocationService;
 import com.dumbqr.dumbqr.service.QrCodeService;
+import com.google.zxing.WriterException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 public class PublicController {
@@ -44,6 +46,8 @@ public class PublicController {
     @Autowired
     private BloomFilterService bloomFilterService;
 
+    private static final List<String> RESERVED_PREFIXES = List.of("api", "admin", "dashboard");
+
     //Homepage
     @GetMapping("/")
     public ResponseEntity<?> homepage(HttpServletResponse response) throws IOException {
@@ -52,6 +56,25 @@ public class PublicController {
             return new ResponseEntity<>(HttpStatus.PERMANENT_REDIRECT);
         } catch (Exception e){
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/qrimage")
+    public ResponseEntity<?> qrimage(@RequestBody QrCode qrCode) throws IOException, WriterException {
+        if(RESERVED_PREFIXES.stream().anyMatch(qrCode.getShortId()::startsWith)){
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        //bloom filter
+        if(bloomFilterService.lookUp(qrCode.getShortId())){
+            return new ResponseEntity<>("Short url already taken", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        try{
+            byte[] qrImage = qrCodeService.getQrimage(qrCode.getShortId(), qrCode.getForeground(), qrCode.getBackground());
+            return new ResponseEntity<>(qrImage, HttpStatus.OK);
+        } catch (Exception e){
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
