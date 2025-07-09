@@ -74,7 +74,7 @@ public class PublicController {
             byte[] qrImage = qrCodeService.getQrimage(qrCode.getShortId(), qrCode.getForeground(), qrCode.getBackground());
             return new ResponseEntity<>(qrImage, HttpStatus.OK);
         } catch (Exception e){
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -111,7 +111,7 @@ public class PublicController {
             return new ResponseEntity<>(HttpStatus.TEMPORARY_REDIRECT);
 
         } catch (Exception e){
-            return new ResponseEntity<>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
