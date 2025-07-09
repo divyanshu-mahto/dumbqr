@@ -5,6 +5,15 @@
 
 Create QR codes that evolve with your needs. Change links anytime, track scans, and never reprint a QR code again.
 
+Key Features:
+* **Custom Short URLs**: Provides the ability to generate custom, memorable short URLs for each QR code, enhancing user experience and brand consistency. 
+* **Dynamic QR's**: Enables users to modify the redirect URL of an existing QR code at any time. 
+* **Fast Redirection**: Utilizes Redis caching for lightning fast redirection of short URLs, minimizing latency for end-users (qr scanners). 
+* **Detailed Analytics**: Provides comprehensive scan analytics, including the location of each scan, offering valuable performance insights for every generated QR code. 
+* **Customizable**: Offers extensive customization options for QR codes
+* **OTP-based 2FA Authentication**: Enhances security with email OTP based Two Factor Authentication for secure user access and management. 
+* **Rate-Limited Endpoints**: Protects the API by implementing rate limiting on various endpoints, ensuring stability and preventing misuse or abuse.
+
 
 ## Demo
 
